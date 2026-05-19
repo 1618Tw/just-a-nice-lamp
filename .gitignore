@@ -40,8 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# brand assets (large binaries, tracked separately)
-*.mp4
-*.png
-*.jpg
-*.jpeg
+# brand assets at repo root (raw drops; production copies live in public/)
+/*.mp4
+/*.png
+/*.jpg
+/*.jpeg
