@@ -5,9 +5,19 @@ import { useScrollProgress } from '@/lib/scrollProgress';
 export interface ScrollVideoProps {
   src: string;
   className?: string;
+  /** Headline rendered as a centered overlay that fades in mid-scroll. */
+  headline?: string;
+  /** Small kicker text rendered above the headline. */
+  kicker?: string;
 }
 
-export function ScrollVideo({ src, className }: ScrollVideoProps) {
+function fade(progress: number, inAt: number, outAt: number, fadeRange = 0.08) {
+  const inO = Math.min(Math.max((progress - inAt) / fadeRange, 0), 1);
+  const outO = Math.min(Math.max((outAt - progress) / fadeRange, 0), 1);
+  return inO * outO;
+}
+
+export function ScrollVideo({ src, className, headline, kicker }: ScrollVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const progress = useScrollProgress(containerRef);
@@ -49,6 +59,10 @@ export function ScrollVideo({ src, className }: ScrollVideoProps) {
     };
   }, [reducedMotion]);
 
+  const headlineOpacity = fade(progress, 0.42, 0.88, 0.1);
+  const kickerOpacity = fade(progress, 0.18, 0.92, 0.08);
+  const cueOpacity = Math.max(1 - progress * 6, 0);
+
   return (
     <div ref={containerRef} className={className ?? 'relative h-[300vh] bg-ink'}>
       <div className="sticky top-0 h-screen w-full overflow-hidden">
@@ -61,10 +75,36 @@ export function ScrollVideo({ src, className }: ScrollVideoProps) {
           aria-hidden="true"
           className="h-full w-full object-cover"
         />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-ink/30 via-transparent to-ink/40" />
+
+        {kicker && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-[18%] -translate-x-1/2 text-[10px] uppercase tracking-[0.45em] text-ivory/80"
+            style={{ opacity: kickerOpacity }}
+          >
+            {kicker}
+          </div>
+        )}
+
+        {headline && (
+          <h1
+            className="pointer-events-none absolute left-1/2 top-1/2 w-full -translate-x-1/2 -translate-y-1/2 px-6 text-center font-serif text-ivory"
+            style={{
+              opacity: headlineOpacity,
+              fontSize: 'clamp(48px, 9vw, 132px)',
+              lineHeight: 1,
+              letterSpacing: '-0.01em',
+              textShadow: '0 2px 30px rgba(0,0,0,0.35)',
+            }}
+          >
+            {headline}
+          </h1>
+        )}
+
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-ivory/70"
-          style={{ opacity: Math.max(1 - progress * 6, 0) }}
+          className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.45em] text-ivory/70"
+          style={{ opacity: cueOpacity }}
         >
           scroll
         </div>
