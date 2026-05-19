@@ -73,7 +73,7 @@ export function ScrollVideo({ src, className, headline, kicker }: ScrollVideoPro
           playsInline
           preload="auto"
           aria-hidden="true"
-          className="h-full w-full object-contain"
+          className="h-full w-full object-cover"
         />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-ink/30 via-transparent to-ink/40" />
 
