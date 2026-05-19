@@ -68,6 +68,13 @@ export function ScrollVideo({ src, className, smoothing = 0.15 }: ScrollVideoPro
           aria-hidden="true"
           className="h-full w-full object-cover"
         />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-ivory/70"
+          style={{ opacity: Math.max(1 - progress * 6, 0) }}
+        >
+          scroll
+        </div>
       </div>
     </div>
   );
