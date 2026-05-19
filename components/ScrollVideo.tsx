@@ -1,11 +1,10 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useScrollProgress } from '@/lib/scrollProgress';
 
 export interface ScrollVideoProps {
   src: string;
   className?: string;
-  /** lerp factor 0..1, lower = smoother but laggier. Default 0.15. */
   smoothing?: number;
 }
 
@@ -16,16 +15,24 @@ export function ScrollVideo({ src, className, smoothing = 0.15 }: ScrollVideoPro
   const targetTime = useRef(0);
   const currentTime = useRef(0);
   const rafId = useRef<number | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
-  // Set target whenever scroll progress changes.
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mq.matches);
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !isFinite(v.duration)) return;
     targetTime.current = progress * v.duration;
   }, [progress]);
 
-  // Lerp currentTime toward target each frame.
   useEffect(() => {
+    if (reducedMotion) return;
     const v = videoRef.current;
     if (!v) return;
     v.pause();
@@ -37,22 +44,16 @@ export function ScrollVideo({ src, className, smoothing = 0.15 }: ScrollVideoPro
       const diff = targetTime.current - currentTime.current;
       if (Math.abs(diff) > 0.001) {
         currentTime.current += diff * smoothing;
-        try {
-          v.currentTime = currentTime.current;
-        } catch {
-          /* video not ready */
-        }
+        try { v.currentTime = currentTime.current; } catch {}
       }
       rafId.current = requestAnimationFrame(tick);
     };
     rafId.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafId.current != null) cancelAnimationFrame(rafId.current);
-    };
-  }, [smoothing]);
+    return () => { if (rafId.current != null) cancelAnimationFrame(rafId.current); };
+  }, [smoothing, reducedMotion]);
 
   return (
-    <div ref={containerRef} className={className ?? 'relative h-[300vh] md:h-[300vh] bg-ink'}>
+    <div ref={containerRef} className={className ?? 'relative h-[300vh] bg-ink'}>
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         <video
           ref={videoRef}
