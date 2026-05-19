@@ -5,16 +5,13 @@ import { useScrollProgress } from '@/lib/scrollProgress';
 export interface ScrollVideoProps {
   src: string;
   className?: string;
-  /** lerp factor 0..1, lower = smoother but laggier. Default 0.15. */
-  smoothing?: number;
 }
 
-export function ScrollVideo({ src, className, smoothing = 0.15 }: ScrollVideoProps) {
+export function ScrollVideo({ src, className }: ScrollVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const progress = useScrollProgress(containerRef);
   const progressRef = useRef(0);
-  const currentTime = useRef(0);
   const rafId = useRef<number | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -34,18 +31,14 @@ export function ScrollVideo({ src, className, smoothing = 0.15 }: ScrollVideoPro
     if (!v) return;
     v.pause();
     const tick = () => {
-      if (!isFinite(v.duration) || v.duration <= 0) {
-        rafId.current = requestAnimationFrame(tick);
-        return;
-      }
-      const target = progressRef.current * v.duration;
-      const diff = target - currentTime.current;
-      if (Math.abs(diff) > 0.001) {
-        currentTime.current += diff * smoothing;
-        try {
-          v.currentTime = currentTime.current;
-        } catch {
-          /* video not ready */
+      if (isFinite(v.duration) && v.duration > 0) {
+        const target = progressRef.current * v.duration;
+        if (Math.abs(v.currentTime - target) > 1 / 60) {
+          try {
+            v.currentTime = target;
+          } catch {
+            /* video not ready */
+          }
         }
       }
       rafId.current = requestAnimationFrame(tick);
@@ -54,7 +47,7 @@ export function ScrollVideo({ src, className, smoothing = 0.15 }: ScrollVideoPro
     return () => {
       if (rafId.current != null) cancelAnimationFrame(rafId.current);
     };
-  }, [smoothing, reducedMotion]);
+  }, [reducedMotion]);
 
   return (
     <div ref={containerRef} className={className ?? 'relative h-[300vh] bg-ink'}>
