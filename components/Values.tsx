@@ -24,15 +24,28 @@ export function Values() {
       </div>
 
       <div className="md:order-2 md:col-span-5">
-        <span className="block text-[10px] uppercase tracking-[0.45em] text-mute">Edition 01</span>
-        <h2 className="mt-4 font-serif text-4xl leading-[1.05] md:text-5xl">
+        <span className="block text-xs uppercase tracking-[0.45em] text-mute">Edition 01</span>
+        <h2
+          className="mt-5 font-serif leading-[1.02]"
+          style={{ fontSize: 'clamp(44px, 6vw, 96px)', letterSpacing: '-0.01em' }}
+        >
           Considered, end to end.
         </h2>
-        <ol className="mt-12 space-y-8">
+        <ol className="mt-14 space-y-10">
           {VALUES.map((title, i) => (
-            <li key={title} className="flex items-baseline gap-6">
-              <span className="font-serif text-2xl text-coral md:text-3xl">{String(i + 1).padStart(2, '0')}</span>
-              <span className="font-serif text-2xl md:text-3xl">{title}</span>
+            <li key={title} className="flex items-baseline gap-7">
+              <span
+                className="font-serif text-coral"
+                style={{ fontSize: 'clamp(28px, 3.5vw, 56px)' }}
+              >
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span
+                className="font-serif leading-tight"
+                style={{ fontSize: 'clamp(32px, 4.2vw, 68px)', letterSpacing: '-0.005em' }}
+              >
+                {title}
+              </span>
             </li>
           ))}
         </ol>
