@@ -2,6 +2,7 @@ import { ScrollVideo } from '@/components/ScrollVideo';
 import { Statement } from '@/components/Statement';
 import { ScrollMorph } from '@/components/ScrollMorph';
 import { PreorderForm } from '@/components/PreorderForm';
+import { Footer } from '@/components/Footer';
 
 export default function Home() {
   return (
@@ -22,6 +23,7 @@ export default function Home() {
         </p>
         <PreorderForm />
       </section>
+      <Footer />
     </main>
   );
 }
