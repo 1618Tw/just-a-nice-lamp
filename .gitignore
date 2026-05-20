@@ -46,3 +46,6 @@ next-env.d.ts
 /*.png
 /*.jpg
 /*.jpeg
+
+# raw media drops (re-encoded versions live in public/)
+/media/
