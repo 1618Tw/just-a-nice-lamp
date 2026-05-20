@@ -1,33 +1,82 @@
 'use client';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useScrollProgress } from '@/lib/scrollProgress';
 import { PreorderForm } from './PreorderForm';
 
+// Phase the section across its scroll travel:
+//   0.00 - 0.65  scrub closing.mp4 from start to end
+//   0.60 - 0.95  background blurs in
+//   0.70 - 0.95  pre-order card fades up
+const SCRUB_END = 0.65;
+const BLUR_START = 0.6;
+const BLUR_END = 0.95;
+const CARD_START = 0.7;
+const CARD_END = 0.95;
+
+const ramp = (p: number, start: number, end: number) =>
+  Math.min(Math.max((p - start) / (end - start), 0), 1);
+
 export function FormOverImage() {
   const sectionRef = useRef<HTMLElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const progress = useScrollProgress(sectionRef);
+  const progressRef = useRef(0);
+  const rafId = useRef<number | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
-  // Phase the section:
-  //  0.00 - 0.35  sharp image visible, no card
-  //  0.35 - 0.70  image blurs, card fades up
-  //  0.70 - 1.00  full blur, card settled
-  const ramp = Math.min(Math.max((progress - 0.35) / 0.35, 0), 1);
-  const blur = ramp * 28;
-  const overlayDarkness = 0.15 + ramp * 0.3;
-  const cardOpacity = ramp;
-  const cardLift = (1 - ramp) * 28;
+  progressRef.current = progress;
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mq.matches);
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    const tick = () => {
+      if (isFinite(v.duration) && v.duration > 0) {
+        const local = Math.min(progressRef.current / SCRUB_END, 1);
+        const target = local * v.duration;
+        if (Math.abs(v.currentTime - target) > 1 / 60) {
+          try {
+            v.currentTime = target;
+          } catch {
+            /* video not ready */
+          }
+        }
+      }
+      rafId.current = requestAnimationFrame(tick);
+    };
+    rafId.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafId.current != null) cancelAnimationFrame(rafId.current);
+    };
+  }, [reducedMotion]);
+
+  const blurRamp = ramp(progress, BLUR_START, BLUR_END);
+  const blur = blurRamp * 28;
+  const overlayDarkness = 0.18 + blurRamp * 0.3;
+  const cardOpacity = ramp(progress, CARD_START, CARD_END);
+  const cardLift = (1 - cardOpacity) * 28;
 
   return (
-    <section id="preorder" ref={sectionRef} className="relative h-[280vh]">
+    <section id="preorder" ref={sectionRef} className="relative h-[350vh] bg-ink">
       <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
-        <div
+        <video
+          ref={videoRef}
+          src="/closing.mp4"
+          muted
+          playsInline
+          preload="auto"
           aria-hidden="true"
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url(/lamp-room.png)',
-            filter: `blur(${blur}px) saturate(0.95)`,
-            transform: 'scale(1.06)',
-          }}
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ filter: `blur(${blur}px) saturate(0.95)` }}
         />
         <div
           aria-hidden="true"
@@ -37,9 +86,9 @@ export function FormOverImage() {
 
         <div
           className="pointer-events-none absolute left-6 top-10 text-[10px] uppercase tracking-[0.45em] text-ivory/80 md:left-16"
-          style={{ opacity: 1 - ramp }}
+          style={{ opacity: 1 - cardOpacity }}
         >
-          Reserve — Edition 01
+          Reserve &mdash; Edition 01
         </div>
 
         <div
@@ -50,10 +99,14 @@ export function FormOverImage() {
             background: 'rgba(244, 234, 216, 0.97)',
             boxShadow: '0 30px 80px rgba(0,0,0,0.35)',
             transition: 'opacity 80ms linear, transform 80ms linear',
+            pointerEvents: cardOpacity > 0.5 ? 'auto' : 'none',
           }}
         >
           <span className="block text-center text-[10px] uppercase tracking-[0.45em] text-mute">Pre-order</span>
-          <h2 className="mt-3 text-center font-serif text-4xl md:text-5xl" style={{ letterSpacing: '-0.01em' }}>
+          <h2
+            className="mt-3 text-center font-serif text-4xl md:text-5xl"
+            style={{ letterSpacing: '-0.01em' }}
+          >
             Reserve yours.
           </h2>
           <p className="mx-auto mt-3 mb-10 max-w-xs text-center text-xs leading-relaxed text-mute">
