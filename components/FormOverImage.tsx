@@ -9,9 +9,9 @@ import { PreorderForm } from './PreorderForm';
 //   0.70 - 0.95  pre-order card fades up
 const SCRUB_END = 0.65;
 const BLUR_START = 0.6;
-const BLUR_END = 0.95;
+const BLUR_END = 0.78;
 const CARD_START = 0.7;
-const CARD_END = 0.95;
+const CARD_END = 0.82;
 
 const ramp = (p: number, start: number, end: number) =>
   Math.min(Math.max((p - start) / (end - start), 0), 1);
@@ -88,7 +88,7 @@ export function FormOverImage() {
           className="pointer-events-none absolute left-6 top-10 text-[10px] uppercase tracking-[0.45em] text-ivory/80 md:left-16"
           style={{ opacity: 1 - cardOpacity }}
         >
-          Reserve &mdash; Edition 01
+          Reserve, Edition 01
         </div>
 
         <div
@@ -110,7 +110,7 @@ export function FormOverImage() {
             Reserve yours.
           </h2>
           <p className="mx-auto mt-3 mb-10 max-w-xs text-center text-xs leading-relaxed text-mute">
-            Limited first run. No payment now &mdash; we&rsquo;ll email when shipping opens.
+            Limited first run. No payment now, we&rsquo;ll email when shipping opens.
           </p>
           <PreorderForm />
         </div>

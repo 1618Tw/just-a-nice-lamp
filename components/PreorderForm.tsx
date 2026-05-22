@@ -4,9 +4,14 @@ import { COUNTRIES } from '@/lib/countries';
 
 type State = 'idle' | 'sending' | 'success' | 'error';
 
-export function PreorderForm() {
+interface PreorderFormProps {
+  layout?: 'vertical' | 'horizontal';
+}
+
+export function PreorderForm({ layout = 'vertical' }: PreorderFormProps = {}) {
   const [state, setState] = useState<State>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const horizontal = layout === 'horizontal';
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,7 +50,14 @@ export function PreorderForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto grid w-full max-w-md gap-4">
+    <form
+      onSubmit={onSubmit}
+      className={
+        horizontal
+          ? 'grid w-full gap-x-6 gap-y-4 md:grid-cols-2 md:items-end'
+          : 'mx-auto grid w-full max-w-md gap-4'
+      }
+    >
       <label className="grid gap-1 text-sm">
         <span className="text-mute uppercase tracking-[0.2em] text-xs">Name</span>
         <input
@@ -104,13 +116,20 @@ export function PreorderForm() {
       <button
         type="submit"
         disabled={state === 'sending'}
-        className="mt-4 bg-coral text-ink py-3 text-sm uppercase tracking-[0.25em] disabled:opacity-60"
+        className={
+          horizontal
+            ? 'mt-2 bg-coral text-ink py-3 text-sm uppercase tracking-[0.25em] disabled:opacity-60 md:col-span-2'
+            : 'mt-4 bg-coral text-ink py-3 text-sm uppercase tracking-[0.25em] disabled:opacity-60'
+        }
       >
         {state === 'sending' ? 'Sending…' : 'Reserve'}
       </button>
 
       {state === 'error' && (
-        <p className="text-sm text-coral" role="alert">
+        <p
+          className={horizontal ? 'text-sm text-coral md:col-span-2' : 'text-sm text-coral'}
+          role="alert"
+        >
           Something went wrong ({errorMsg}). Please try again.
         </p>
       )}

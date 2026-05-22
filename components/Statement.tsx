@@ -1,52 +1,15 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { MagicText } from '@/components/ui/magic-text';
 
-export interface StatementProps {
-  headline: string;
-  sub?: string;
-}
-
-export function Statement({ headline, sub }: StatementProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) setVisible(true);
-      },
-      { threshold: 0.4 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
+export function Statement() {
   return (
-    <section
-      ref={ref}
-      className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
-    >
-      <h2
-        className="font-serif text-ink transition-all duration-1000 ease-out"
-        style={{
-          fontSize: 'clamp(64px, 12vw, 180px)',
-          opacity: visible ? 1 : 0,
-          transform: visible ? 'translateY(0)' : 'translateY(20px)',
-          lineHeight: 1,
-        }}
-      >
-        {headline}
-      </h2>
-      {sub && (
-        <p
-          className="mt-6 text-sm uppercase tracking-[0.25em] text-mute transition-opacity duration-1000 delay-300"
-          style={{ opacity: visible ? 1 : 0 }}
-        >
-          {sub}
-        </p>
-      )}
+    <section className="flex min-h-screen items-center justify-center bg-ivory px-6 md:px-16">
+      <div className="max-w-5xl">
+        <MagicText
+          text="I wanted to see how far flat lights can go. If we see them from another perspective, they could be invisible, feel very light, and at the same time the biggest presence in the room."
+          className="text-ink"
+        />
+      </div>
     </section>
   );
 }

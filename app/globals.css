@@ -5,8 +5,8 @@
   --color-coral: #C04A2D;
   --color-ink: #1F1B16;
   --color-mute: #A89E8E;
-  --font-sans: var(--font-sans);
-  --font-serif: var(--font-serif);
+  --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-serif: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 html, body { background: var(--color-ivory); color: var(--color-ink); }
