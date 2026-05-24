@@ -100,15 +100,20 @@ export function IntroAnimation() {
     };
     const tick = () => {
       const p = progressRef.current;
-      if (v) scrub(v, Math.min(p / SCRUB_END, 1));
-      if (lamp) {
+      // Only scrub the video that is currently (or about to be) on screen.
+      // The intro oval is the active layer until SCRUB_END; the lamp is active
+      // from HERO_START through SHAPES_CUT; the shapes take over after that.
+      if (v && p <= SCRUB_END + 0.02) {
+        scrub(v, Math.min(p / SCRUB_END, 1));
+      }
+      if (lamp && p >= HERO_START - 0.02 && p < SHAPES_CUT + 0.02) {
         const local = Math.min(
           Math.max((p - HERO_END) / (LAMP_SCRUB_END - HERO_END), 0),
           1,
         );
         scrub(lamp, local);
       }
-      if (shapes) {
+      if (shapes && p >= SHAPES_CUT - 0.02) {
         const local = Math.min(
           Math.max((p - LAMP_SCRUB_END) / (SHAPES_SCRUB_END - LAMP_SCRUB_END), 0),
           1,
