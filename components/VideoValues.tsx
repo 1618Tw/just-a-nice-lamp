@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useScrollProgress } from '@/lib/scrollProgress';
-import { prepareScrubVideo } from '@/lib/scrubVideo';
+import { frameIndex, useImageSequence } from '@/lib/imageSequence';
 import { PreorderForm } from './PreorderForm';
+
+const CLOSING_FRAMES = 90;
 
 const VALUES = [
   { num: '01', title: 'Built in Europe', desc: 'Designed and assembled in Italy, using local supply chains and small-batch manufacturing to ensure quality at every step.' },
@@ -24,11 +26,13 @@ const ramp = (p: number, start: number, end: number) =>
 
 export function VideoValues() {
   const sectionRef = useRef<HTMLElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const progress = useScrollProgress(sectionRef);
   const progressRef = useRef(0);
   const rafId = useRef<number | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const closing = useImageSequence('/frames/closing', CLOSING_FRAMES);
 
   progressRef.current = progress;
 
@@ -41,21 +45,25 @@ export function VideoValues() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
     if (reducedMotion) return;
-    const v = videoRef.current;
-    if (!v) return;
-    let ready = false;
-    prepareScrubVideo(v).then(() => { ready = true; });
+    let lastIdx = -1;
     const tick = () => {
-      if (ready && isFinite(v.duration) && v.duration > 0) {
-        const local = Math.min(progressRef.current / SCRUB_END, 1);
-        const target = local * v.duration;
-        if (Math.abs(v.currentTime - target) > 1 / 60) {
-          try {
-            v.currentTime = target;
-          } catch {
-            /* video not ready */
-          }
+      const local = Math.min(progressRef.current / SCRUB_END, 1);
+      const idx = frameIndex(local, CLOSING_FRAMES);
+      const img = imgRef.current;
+      if (img && idx !== lastIdx) {
+        const url = closing.urls[idx];
+        if (url) {
+          img.src = url;
+          lastIdx = idx;
         }
       }
       rafId.current = requestAnimationFrame(tick);
@@ -64,7 +72,7 @@ export function VideoValues() {
     return () => {
       if (rafId.current != null) cancelAnimationFrame(rafId.current);
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, closing.urls]);
 
   const overlayDarkness = 0.1 + ramp(progress, 0.22, 0.45) * 0.45;
   const formProgress = ramp(progress, FORM_START, FORM_END);
@@ -73,14 +81,13 @@ export function VideoValues() {
   return (
     <section ref={sectionRef} className="relative h-[250vh] bg-ink md:h-[400vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        <video
-          ref={videoRef}
-          src="/closing.mp4"
-          poster="/closing-poster.jpg"
-          muted
-          playsInline
-          preload="auto"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={closing.urls[0]}
+          alt=""
           aria-hidden="true"
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div
@@ -90,18 +97,21 @@ export function VideoValues() {
         />
 
         <div
-          className="absolute inset-0 flex items-start justify-center px-6 pt-10 md:px-16 md:pt-14"
+          className="absolute inset-0 flex items-start justify-center px-6 pt-4 md:px-16 md:pt-14"
         >
           <div className="grid w-full max-w-5xl grid-cols-1 gap-8 md:grid-cols-3 md:gap-12">
             {VALUES.map(({ num, title, desc }, i) => {
               const [start, end] = COL_WINDOWS[i];
               const colProgress = ramp(progress, start, end);
+              // On mobile the values and the preorder form occupy the same
+              // vertical space; fade the values out as the form comes up.
+              const opacity = isMobile ? colProgress * (1 - formProgress) : colProgress;
               return (
                 <div
                   key={num}
                   className="text-ivory"
                   style={{
-                    opacity: colProgress,
+                    opacity,
                     transform: `translateY(${(1 - colProgress) * 60}vh)`,
                   }}
                 >

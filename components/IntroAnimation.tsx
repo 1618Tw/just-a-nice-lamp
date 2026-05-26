@@ -1,14 +1,14 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { prepareScrubVideo } from '@/lib/scrubVideo';
+import { frameIndex, useImageSequence } from '@/lib/imageSequence';
 
 // Timeline (fractions of total scroll through the pinned section):
-//   0.00 - 0.25  oval intro video scrubs
+//   0.00 - 0.25  oval intro frames scrub
 //   0.24 - 0.32  title fades in
 //   0.31 - 0.42  oval out, lamp in
 //   0.42 - 0.62  lamp decomposes (scrubs)
-//   0.62         shapes video cuts in (instant) on top of lamp
-//   0.62 - 0.95  shapes video scrubs
+//   0.62         shapes cut in (instant) on top of lamp
+//   0.62 - 0.95  shapes scrub
 //   0.72 - 0.84  statement text fades in on the left
 const SCRUB_END = 0.25;
 const TEXT_START = 0.24;
@@ -25,6 +25,10 @@ const STATEMENT_END = 0.84;
 const TITLE_FADE_OUT_START = 0.58;
 const TITLE_FADE_OUT_END = 0.66;
 
+const INTRO_FRAMES = 48;
+const LAMP_FRAMES = 60;
+const SHAPES_FRAMES = 60;
+
 const STATEMENT_TEXT =
   'I wanted to see how far flat lights can go. If we see them from another perspective, they could be invisible, feel very light, and at the same time the biggest presence in the room.';
 
@@ -33,13 +37,23 @@ const ramp = (p: number, start: number, end: number) =>
 
 export function IntroAnimation() {
   const sectionRef = useRef<HTMLElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const lampVideoRef = useRef<HTMLVideoElement>(null);
-  const shapesVideoRef = useRef<HTMLVideoElement>(null);
+  const introImgRef = useRef<HTMLImageElement>(null);
+  const lampImgRef = useRef<HTMLImageElement>(null);
+  const shapesImgRef = useRef<HTMLImageElement>(null);
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
   const rafId = useRef<number | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Use the vertical-format sources on phones so the lamp and shapes
+  // aren't cropped to a narrow vertical slice of a landscape frame.
+  const lampFolder = isMobile ? '/frames/hero-lamp-mobile' : '/frames/hero-lamp';
+  const shapesFolder = isMobile ? '/frames/shapes-mobile' : '/frames/shapes';
+
+  const intro = useImageSequence('/frames/intro', INTRO_FRAMES);
+  const lamp = useImageSequence(lampFolder, LAMP_FRAMES);
+  const shapes = useImageSequence(shapesFolder, SHAPES_FRAMES);
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -80,49 +94,49 @@ export function IntroAnimation() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
     if (reducedMotion) return;
-    const v = videoRef.current;
-    const lamp = lampVideoRef.current;
-    const shapes = shapesVideoRef.current;
-    if (!v && !lamp && !shapes) return;
+    const last = { intro: -1, lamp: -1, shapes: -1 };
 
-    const ready = { v: false, lamp: false, shapes: false };
-    if (v) prepareScrubVideo(v).then(() => { ready.v = true; });
-    if (lamp) prepareScrubVideo(lamp).then(() => { ready.lamp = true; });
-    if (shapes) prepareScrubVideo(shapes).then(() => { ready.shapes = true; });
-
-    const scrub = (el: HTMLVideoElement, local: number, isReady: boolean) => {
-      if (!isReady || !isFinite(el.duration) || el.duration <= 0) return;
-      const target = local * el.duration;
-      if (Math.abs(el.currentTime - target) > 1 / 60) {
-        try {
-          el.currentTime = target;
-        } catch {
-          /* video not ready */
-        }
-      }
+    const swap = (
+      img: HTMLImageElement | null,
+      urls: string[],
+      idx: number,
+      key: 'intro' | 'lamp' | 'shapes',
+    ) => {
+      if (!img || idx === last[key]) return;
+      const url = urls[idx];
+      if (!url) return;
+      img.src = url;
+      last[key] = idx;
     };
+
     const tick = () => {
       const p = progressRef.current;
-      // Only scrub the video that is currently (or about to be) on screen.
-      // The intro oval is the active layer until SCRUB_END; the lamp is active
-      // from HERO_START through SHAPES_CUT; the shapes take over after that.
-      if (v && p <= SCRUB_END + 0.02) {
-        scrub(v, Math.min(p / SCRUB_END, 1), ready.v);
+      if (p <= SCRUB_END + 0.02) {
+        const local = Math.min(p / SCRUB_END, 1);
+        swap(introImgRef.current, intro.urls, frameIndex(local, INTRO_FRAMES), 'intro');
       }
-      if (lamp && p >= HERO_START - 0.02 && p < SHAPES_CUT + 0.02) {
+      if (p >= HERO_START - 0.02 && p < SHAPES_CUT + 0.02) {
         const local = Math.min(
           Math.max((p - HERO_END) / (LAMP_SCRUB_END - HERO_END), 0),
           1,
         );
-        scrub(lamp, local, ready.lamp);
+        swap(lampImgRef.current, lamp.urls, frameIndex(local, LAMP_FRAMES), 'lamp');
       }
-      if (shapes && p >= SHAPES_CUT - 0.02) {
+      if (p >= SHAPES_CUT - 0.02) {
         const local = Math.min(
           Math.max((p - LAMP_SCRUB_END) / (SHAPES_SCRUB_END - LAMP_SCRUB_END), 0),
           1,
         );
-        scrub(shapes, local, ready.shapes);
+        swap(shapesImgRef.current, shapes.urls, frameIndex(local, SHAPES_FRAMES), 'shapes');
       }
       rafId.current = requestAnimationFrame(tick);
     };
@@ -130,7 +144,7 @@ export function IntroAnimation() {
     return () => {
       if (rafId.current != null) cancelAnimationFrame(rafId.current);
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, intro.urls, lamp.urls, shapes.urls]);
 
   const textOpacity =
     ramp(progress, TEXT_START, TEXT_END) *
@@ -151,32 +165,30 @@ export function IntroAnimation() {
         >
           Scroll to reveal
         </div>
-        <video
-          ref={lampVideoRef}
-          src="/hero-lamp.mp4"
-          poster="/hero-lamp-poster.jpg"
-          muted
-          playsInline
-          preload="auto"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={lampImgRef}
+          src={lamp.urls[0]}
+          alt=""
           aria-hidden="true"
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
           style={{ opacity: heroOpacity, transform: 'scale(1.15)', transformOrigin: 'center' }}
         />
 
-        <video
-          ref={shapesVideoRef}
-          src="/shapes.mp4"
-          poster="/shapes-poster.jpg"
-          muted
-          playsInline
-          preload="auto"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={shapesImgRef}
+          src={shapes.urls[0]}
+          alt=""
           aria-hidden="true"
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
           style={{ opacity: shapesOpacity, transform: 'scale(1.15)', transformOrigin: 'center' }}
         />
 
         <div
-          className="pointer-events-none absolute inset-0 z-10 flex items-center px-6 md:px-16"
+          className="pointer-events-none absolute inset-0 z-10 flex items-start px-6 pt-[14vh] md:items-center md:px-16 md:pt-0"
           style={{ opacity: shapesOpacity }}
         >
           <p
@@ -198,14 +210,13 @@ export function IntroAnimation() {
           className="relative flex items-center justify-center"
           style={{ width: 'min(64vw, 620px)', aspectRatio: '16/11.5' }}
         >
-          <video
-            ref={videoRef}
-            src="/intro.mp4"
-            poster="/intro-poster.jpg"
-            muted
-            playsInline
-            preload="auto"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={introImgRef}
+            src={intro.urls[0]}
+            alt=""
             aria-hidden="true"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-contain"
             style={{ opacity: ovalOpacity, mixBlendMode: 'screen' }}
           />
