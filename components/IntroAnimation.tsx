@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { prepareScrubVideo } from '@/lib/scrubVideo';
 
 // Timeline (fractions of total scroll through the pinned section):
 //   0.00 - 0.25  oval intro video scrubs
@@ -84,11 +85,14 @@ export function IntroAnimation() {
     const lamp = lampVideoRef.current;
     const shapes = shapesVideoRef.current;
     if (!v && !lamp && !shapes) return;
-    v?.pause();
-    lamp?.pause();
-    shapes?.pause();
-    const scrub = (el: HTMLVideoElement, local: number) => {
-      if (!isFinite(el.duration) || el.duration <= 0) return;
+
+    const ready = { v: false, lamp: false, shapes: false };
+    if (v) prepareScrubVideo(v).then(() => { ready.v = true; });
+    if (lamp) prepareScrubVideo(lamp).then(() => { ready.lamp = true; });
+    if (shapes) prepareScrubVideo(shapes).then(() => { ready.shapes = true; });
+
+    const scrub = (el: HTMLVideoElement, local: number, isReady: boolean) => {
+      if (!isReady || !isFinite(el.duration) || el.duration <= 0) return;
       const target = local * el.duration;
       if (Math.abs(el.currentTime - target) > 1 / 60) {
         try {
@@ -104,21 +108,21 @@ export function IntroAnimation() {
       // The intro oval is the active layer until SCRUB_END; the lamp is active
       // from HERO_START through SHAPES_CUT; the shapes take over after that.
       if (v && p <= SCRUB_END + 0.02) {
-        scrub(v, Math.min(p / SCRUB_END, 1));
+        scrub(v, Math.min(p / SCRUB_END, 1), ready.v);
       }
       if (lamp && p >= HERO_START - 0.02 && p < SHAPES_CUT + 0.02) {
         const local = Math.min(
           Math.max((p - HERO_END) / (LAMP_SCRUB_END - HERO_END), 0),
           1,
         );
-        scrub(lamp, local);
+        scrub(lamp, local, ready.lamp);
       }
       if (shapes && p >= SHAPES_CUT - 0.02) {
         const local = Math.min(
           Math.max((p - LAMP_SCRUB_END) / (SHAPES_SCRUB_END - LAMP_SCRUB_END), 0),
           1,
         );
-        scrub(shapes, local);
+        scrub(shapes, local, ready.shapes);
       }
       rafId.current = requestAnimationFrame(tick);
     };
@@ -139,7 +143,7 @@ export function IntroAnimation() {
   const scrollHintOpacity = 1 - ramp(progress, 0.0, 0.04);
 
   return (
-    <section id="intro" ref={sectionRef} className="relative h-[800vh] bg-black">
+    <section id="intro" ref={sectionRef} className="relative h-[450vh] bg-black md:h-[800vh]">
       <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
         <div
           className="pointer-events-none absolute bottom-10 left-1/2 z-20 -translate-x-1/2 text-[10px] uppercase tracking-[0.45em] text-ivory/70"
@@ -150,6 +154,7 @@ export function IntroAnimation() {
         <video
           ref={lampVideoRef}
           src="/hero-lamp.mp4"
+          poster="/hero-lamp-poster.jpg"
           muted
           playsInline
           preload="auto"
@@ -161,6 +166,7 @@ export function IntroAnimation() {
         <video
           ref={shapesVideoRef}
           src="/shapes.mp4"
+          poster="/shapes-poster.jpg"
           muted
           playsInline
           preload="auto"
@@ -195,6 +201,7 @@ export function IntroAnimation() {
           <video
             ref={videoRef}
             src="/intro.mp4"
+            poster="/intro-poster.jpg"
             muted
             playsInline
             preload="auto"

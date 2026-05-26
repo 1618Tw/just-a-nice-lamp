@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useScrollProgress } from '@/lib/scrollProgress';
+import { prepareScrubVideo } from '@/lib/scrubVideo';
 import { PreorderForm } from './PreorderForm';
 
 const VALUES = [
@@ -43,9 +44,10 @@ export function VideoValues() {
     if (reducedMotion) return;
     const v = videoRef.current;
     if (!v) return;
-    v.pause();
+    let ready = false;
+    prepareScrubVideo(v).then(() => { ready = true; });
     const tick = () => {
-      if (isFinite(v.duration) && v.duration > 0) {
+      if (ready && isFinite(v.duration) && v.duration > 0) {
         const local = Math.min(progressRef.current / SCRUB_END, 1);
         const target = local * v.duration;
         if (Math.abs(v.currentTime - target) > 1 / 60) {
@@ -69,11 +71,12 @@ export function VideoValues() {
   const formLift = (1 - formProgress) * 50;
 
   return (
-    <section ref={sectionRef} className="relative h-[400vh] bg-ink">
+    <section ref={sectionRef} className="relative h-[250vh] bg-ink md:h-[400vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         <video
           ref={videoRef}
           src="/closing.mp4"
+          poster="/closing-poster.jpg"
           muted
           playsInline
           preload="auto"
