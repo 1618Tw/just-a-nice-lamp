@@ -33,10 +33,3 @@ export function useImageSequence(folder: string, count: number) {
 
   return { imagesRef, urls };
 }
-
-export function frameIndex(local: number, count: number): number {
-  const idx = Math.floor(local * count);
-  if (idx < 0) return 0;
-  if (idx >= count) return count - 1;
-  return idx;
-}

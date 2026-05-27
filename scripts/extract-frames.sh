@@ -19,12 +19,12 @@ mkdir -p "$OUTROOT"
 # name:target_frame_count:max_width:jpeg_qscale (lower q = higher quality)
 # *-mobile entries are vertical (portrait) sources used on phones only.
 SPECS=(
-  "intro:48:1280:5"
-  "hero-lamp:60:1280:5"
-  "hero-lamp-mobile:60:1280:5"
-  "shapes:60:1280:5"
-  "shapes-mobile:60:1280:5"
-  "closing:90:960:7"
+  "intro:96:1280:5"
+  "hero-lamp:120:1280:5"
+  "hero-lamp-mobile:120:1280:5"
+  "shapes:120:1280:5"
+  "shapes-mobile:120:1280:5"
+  "closing:180:960:7"
 )
 
 for spec in "${SPECS[@]}"; do

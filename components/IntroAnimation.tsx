@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { frameIndex, useImageSequence } from '@/lib/imageSequence';
+import { useImageSequence } from '@/lib/imageSequence';
 
 // Timeline (fractions of total scroll through the pinned section):
 //   0.00 - 0.25  oval intro frames scrub
@@ -25,9 +25,9 @@ const STATEMENT_END = 0.84;
 const TITLE_FADE_OUT_START = 0.58;
 const TITLE_FADE_OUT_END = 0.66;
 
-const INTRO_FRAMES = 48;
-const LAMP_FRAMES = 60;
-const SHAPES_FRAMES = 60;
+const INTRO_FRAMES = 96;
+const LAMP_FRAMES = 120;
+const SHAPES_FRAMES = 120;
 
 const STATEMENT_TEXT =
   'I wanted to see how far flat lights can go. If we see them from another perspective, they could be invisible, feel very light, and at the same time the biggest presence in the room.';
@@ -35,11 +35,54 @@ const STATEMENT_TEXT =
 const ramp = (p: number, start: number, end: number) =>
   Math.min(Math.max((p - start) / (end - start), 0), 1);
 
+// Two stacked <img>s per sequence: bottom shows floor(localProgress * (count-1)),
+// top shows ceil, and top opacity = fractional part. This crossfades between
+// adjacent frames so the user sees a continuous transition instead of discrete
+// snaps when scrolling slowly.
+type CrossfadeState = { lower: number; upper: number };
+// If baseOpacity is omitted, only the top image's opacity is touched (the
+// bottom stays at whatever CSS gives it). If provided, both opacities are
+// driven imperatively as base and base*alpha — used for the intro oval,
+// where applying opacity via a wrapper div would create a stacking context
+// that traps mix-blend-mode: screen and produces a black rectangle.
+function crossfade(
+  refA: HTMLImageElement | null,
+  refB: HTMLImageElement | null,
+  urls: string[],
+  count: number,
+  local: number,
+  state: CrossfadeState,
+  baseOpacity?: number,
+) {
+  if (!refA || !refB || count === 0) return;
+  const fIdx = Math.min(Math.max(local * (count - 1), 0), count - 1);
+  const lower = Math.floor(fIdx);
+  const upper = Math.min(count - 1, lower + 1);
+  if (lower !== state.lower) {
+    refA.src = urls[lower];
+    state.lower = lower;
+  }
+  if (upper !== state.upper) {
+    refB.src = urls[upper];
+    state.upper = upper;
+  }
+  const alpha = fIdx - lower;
+  if (baseOpacity !== undefined) {
+    refA.style.opacity = String(baseOpacity);
+    refB.style.opacity = String(baseOpacity * alpha);
+  } else {
+    refB.style.opacity = String(alpha);
+  }
+}
+
 export function IntroAnimation() {
   const sectionRef = useRef<HTMLElement>(null);
-  const introImgRef = useRef<HTMLImageElement>(null);
-  const lampImgRef = useRef<HTMLImageElement>(null);
-  const shapesImgRef = useRef<HTMLImageElement>(null);
+  const introImgA = useRef<HTMLImageElement>(null);
+  const introImgB = useRef<HTMLImageElement>(null);
+  const lampImgA = useRef<HTMLImageElement>(null);
+  const lampImgB = useRef<HTMLImageElement>(null);
+  const shapesImgA = useRef<HTMLImageElement>(null);
+  const shapesImgB = useRef<HTMLImageElement>(null);
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
   const rafId = useRef<number | null>(null);
@@ -103,40 +146,33 @@ export function IntroAnimation() {
 
   useEffect(() => {
     if (reducedMotion) return;
-    const last = { intro: -1, lamp: -1, shapes: -1 };
-
-    const swap = (
-      img: HTMLImageElement | null,
-      urls: string[],
-      idx: number,
-      key: 'intro' | 'lamp' | 'shapes',
-    ) => {
-      if (!img || idx === last[key]) return;
-      const url = urls[idx];
-      if (!url) return;
-      img.src = url;
-      last[key] = idx;
-    };
+    const introState: CrossfadeState = { lower: -1, upper: -1 };
+    const lampState: CrossfadeState = { lower: -1, upper: -1 };
+    const shapesState: CrossfadeState = { lower: -1, upper: -1 };
 
     const tick = () => {
       const p = progressRef.current;
-      if (p <= SCRUB_END + 0.02) {
-        const local = Math.min(p / SCRUB_END, 1);
-        swap(introImgRef.current, intro.urls, frameIndex(local, INTRO_FRAMES), 'intro');
+      // Always drive the oval (opacity + frame) so it fades out cleanly
+      // when scrolling past it; the wrapper-opacity trick we use for the
+      // lamp and shapes layers can't be used here because of mix-blend.
+      {
+        const local = Math.min(Math.max(p / SCRUB_END, 0), 1);
+        const ovalOpacity = 1 - Math.min(Math.max((p - OVAL_FADE_START) / (OVAL_FADE_END - OVAL_FADE_START), 0), 1);
+        crossfade(introImgA.current, introImgB.current, intro.urls, INTRO_FRAMES, local, introState, ovalOpacity);
       }
       if (p >= HERO_START - 0.02 && p < SHAPES_CUT + 0.02) {
         const local = Math.min(
           Math.max((p - HERO_END) / (LAMP_SCRUB_END - HERO_END), 0),
           1,
         );
-        swap(lampImgRef.current, lamp.urls, frameIndex(local, LAMP_FRAMES), 'lamp');
+        crossfade(lampImgA.current, lampImgB.current, lamp.urls, LAMP_FRAMES, local, lampState);
       }
       if (p >= SHAPES_CUT - 0.02) {
         const local = Math.min(
           Math.max((p - LAMP_SCRUB_END) / (SHAPES_SCRUB_END - LAMP_SCRUB_END), 0),
           1,
         );
-        swap(shapesImgRef.current, shapes.urls, frameIndex(local, SHAPES_FRAMES), 'shapes');
+        crossfade(shapesImgA.current, shapesImgB.current, shapes.urls, SHAPES_FRAMES, local, shapesState);
       }
       rafId.current = requestAnimationFrame(tick);
     };
@@ -150,7 +186,6 @@ export function IntroAnimation() {
     ramp(progress, TEXT_START, TEXT_END) *
     (1 - ramp(progress, TITLE_FADE_OUT_START, TITLE_FADE_OUT_END));
   const heroOpacity = ramp(progress, HERO_START, HERO_END);
-  const ovalOpacity = 1 - ramp(progress, OVAL_FADE_START, OVAL_FADE_END);
   const shapesOpacity = progress >= SHAPES_CUT ? 1 : 0;
   const statementOpacity = ramp(progress, STATEMENT_START, STATEMENT_END);
   const statementSlide = (1 - statementOpacity) * 80;
@@ -165,27 +200,56 @@ export function IntroAnimation() {
         >
           Scroll to reveal
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={lampImgRef}
-          src={lamp.urls[0]}
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ opacity: heroOpacity, transform: 'scale(1.15)', transformOrigin: 'center' }}
-        />
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={shapesImgRef}
-          src={shapes.urls[0]}
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
+        <div
+          className="absolute inset-0"
+          style={{ opacity: heroOpacity, transform: 'scale(1.15)', transformOrigin: 'center' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={lampImgA}
+            src={lamp.urls[0]}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={lampImgB}
+            src={lamp.urls[0]}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ opacity: 0 }}
+          />
+        </div>
+
+        <div
+          className="absolute inset-0"
           style={{ opacity: shapesOpacity, transform: 'scale(1.15)', transformOrigin: 'center' }}
-        />
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={shapesImgA}
+            src={shapes.urls[0]}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={shapesImgB}
+            src={shapes.urls[0]}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ opacity: 0 }}
+          />
+        </div>
 
         <div
           className="pointer-events-none absolute inset-0 z-10 flex items-start px-6 pt-[14vh] md:items-center md:px-16 md:pt-0"
@@ -212,17 +276,27 @@ export function IntroAnimation() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            ref={introImgRef}
+            ref={introImgA}
             src={intro.urls[0]}
             alt=""
             aria-hidden="true"
             decoding="async"
             className="absolute inset-0 h-full w-full object-contain"
-            style={{ opacity: ovalOpacity, mixBlendMode: 'screen' }}
+            style={{ mixBlendMode: 'screen' }}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={introImgB}
+            src={intro.urls[0]}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-contain"
+            style={{ mixBlendMode: 'screen', opacity: 0 }}
           />
 
           <h1
-            className="pointer-events-none relative z-10 px-4 text-center"
+            className="pointer-events-none relative z-10 -translate-y-[2vh] px-4 text-center md:translate-y-0"
             style={{
               opacity: textOpacity,
               color: `color-mix(in srgb, #F4EAD8 ${Math.round((1 - heroOpacity) * 100)}%, #1F1B16)`,

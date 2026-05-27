@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useScrollProgress } from '@/lib/scrollProgress';
-import { frameIndex, useImageSequence } from '@/lib/imageSequence';
+import { useImageSequence } from '@/lib/imageSequence';
 import { PreorderForm } from './PreorderForm';
 
-const CLOSING_FRAMES = 90;
+const CLOSING_FRAMES = 180;
 
 const VALUES = [
   { num: '01', title: 'Built in Europe', desc: 'Designed and assembled in Italy, using local supply chains and small-batch manufacturing to ensure quality at every step.' },
@@ -26,7 +26,8 @@ const ramp = (p: number, start: number, end: number) =>
 
 export function VideoValues() {
   const sectionRef = useRef<HTMLElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const imgA = useRef<HTMLImageElement>(null);
+  const imgB = useRef<HTMLImageElement>(null);
   const progress = useScrollProgress(sectionRef);
   const progressRef = useRef(0);
   const rafId = useRef<number | null>(null);
@@ -54,17 +55,25 @@ export function VideoValues() {
 
   useEffect(() => {
     if (reducedMotion) return;
-    let lastIdx = -1;
+    let lastLower = -1;
+    let lastUpper = -1;
     const tick = () => {
-      const local = Math.min(progressRef.current / SCRUB_END, 1);
-      const idx = frameIndex(local, CLOSING_FRAMES);
-      const img = imgRef.current;
-      if (img && idx !== lastIdx) {
-        const url = closing.urls[idx];
-        if (url) {
-          img.src = url;
-          lastIdx = idx;
+      const a = imgA.current;
+      const b = imgB.current;
+      if (a && b) {
+        const local = Math.min(progressRef.current / SCRUB_END, 1);
+        const fIdx = Math.min(Math.max(local * (CLOSING_FRAMES - 1), 0), CLOSING_FRAMES - 1);
+        const lower = Math.floor(fIdx);
+        const upper = Math.min(CLOSING_FRAMES - 1, lower + 1);
+        if (lower !== lastLower) {
+          a.src = closing.urls[lower];
+          lastLower = lower;
         }
+        if (upper !== lastUpper) {
+          b.src = closing.urls[upper];
+          lastUpper = upper;
+        }
+        b.style.opacity = String(fIdx - lower);
       }
       rafId.current = requestAnimationFrame(tick);
     };
@@ -83,12 +92,22 @@ export function VideoValues() {
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          ref={imgRef}
+          ref={imgA}
           src={closing.urls[0]}
           alt=""
           aria-hidden="true"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgB}
+          src={closing.urls[0]}
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ opacity: 0 }}
         />
         <div
           aria-hidden="true"
