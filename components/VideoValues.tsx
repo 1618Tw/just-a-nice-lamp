@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useScrollProgress } from '@/lib/scrollProgress';
-import { useImageSequence } from '@/lib/imageSequence';
+import { drawSequenceFrame, useImageSequence } from '@/lib/imageSequence';
 import { PreorderForm } from './PreorderForm';
 
 const CLOSING_FRAMES = 180;
@@ -26,8 +26,7 @@ const ramp = (p: number, start: number, end: number) =>
 
 export function VideoValues() {
   const sectionRef = useRef<HTMLElement>(null);
-  const imgA = useRef<HTMLImageElement>(null);
-  const imgB = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const progress = useScrollProgress(sectionRef);
   const progressRef = useRef(0);
   const rafId = useRef<number | null>(null);
@@ -55,33 +54,16 @@ export function VideoValues() {
 
   useEffect(() => {
     if (reducedMotion) return;
-    let lastLower = -1;
-    let lastUpper = -1;
     const tick = () => {
-      const a = imgA.current;
-      const b = imgB.current;
-      if (a && b) {
-        const local = Math.min(progressRef.current / SCRUB_END, 1);
-        const fIdx = Math.min(Math.max(local * (CLOSING_FRAMES - 1), 0), CLOSING_FRAMES - 1);
-        const lower = Math.floor(fIdx);
-        const upper = Math.min(CLOSING_FRAMES - 1, lower + 1);
-        if (lower !== lastLower) {
-          a.src = closing.urls[lower];
-          lastLower = lower;
-        }
-        if (upper !== lastUpper) {
-          b.src = closing.urls[upper];
-          lastUpper = upper;
-        }
-        b.style.opacity = String(fIdx - lower);
-      }
+      const local = Math.min(progressRef.current / SCRUB_END, 1);
+      drawSequenceFrame(canvasRef.current, closing.imagesRef.current, local, 'cover');
       rafId.current = requestAnimationFrame(tick);
     };
     rafId.current = requestAnimationFrame(tick);
     return () => {
       if (rafId.current != null) cancelAnimationFrame(rafId.current);
     };
-  }, [reducedMotion, closing.urls]);
+  }, [reducedMotion, closing.imagesRef]);
 
   const overlayDarkness = 0.1 + ramp(progress, 0.22, 0.45) * 0.45;
   const formProgress = ramp(progress, FORM_START, FORM_END);
@@ -90,24 +72,10 @@ export function VideoValues() {
   return (
     <section ref={sectionRef} className="relative h-[250vh] bg-ink md:h-[400vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={imgA}
-          src={closing.urls[0]}
-          alt=""
+        <canvas
+          ref={canvasRef}
           aria-hidden="true"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={imgB}
-          src={closing.urls[0]}
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ opacity: 0 }}
+          className="absolute inset-0 h-full w-full"
         />
         <div
           aria-hidden="true"
